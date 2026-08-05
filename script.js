@@ -112,6 +112,9 @@
   const STORAGE_KEY = 'kana_wrong_answers';
   const STARS_KEY = 'kana_level_stars';
 
+  let testMode = false;   // 测试模式：主页输入 saodm 临时开启，刷新即恢复
+  let typedSeq = '';
+
   // State
   let currentView = 'home';
   let currentLevel = 1;
@@ -224,6 +227,7 @@
     catch { return {}; }
   }
   function saveStars(levelId, stars) {
+    if (testMode) return; // 测试模式不写数据，退出后恢复原样
     const data = loadStars();
     data[levelId] = Math.max(data[levelId] || 0, stars);
     try { localStorage.setItem(STARS_KEY, JSON.stringify(data)); }
@@ -553,6 +557,7 @@
 
   // 上一关获得至少 1 星才能解锁下一关
   function isLevelUnlocked(levelId) {
+    if (testMode) return true; // 测试模式全部解锁
     const lv = LEVELS[levelId - 1];
     if (!lv || lv.mode === 1) return true;
     const prevStars = loadStars()[levelId - 1] || 0;
@@ -888,8 +893,36 @@
     showView('game');
   }
 
+  // 测试模式：返回全三星假数据；普通模式读取真实数据
+  function getStars() {
+    if (testMode) {
+      const fake = {};
+      LEVELS.forEach(l => { fake[l.id] = 3; });
+      return fake;
+    }
+    return loadStars();
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    if (!t) return;
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => t.classList.remove('show'), 2600);
+  }
+
+  function toggleTestMode() {
+    testMode = !testMode;
+    showToast(testMode
+      ? '🧪 测试模式已开启：全部关卡解锁，均为三星'
+      : '🧪 测试模式已关闭：已恢复开启前的数据');
+    if (currentView === 'home') updateHomeProgress();
+    if (currentView === 'levels') renderLevelsList();
+  }
+
   function renderLevelsList() {
-    const stars = loadStars();
+    const stars = getStars();
     let html = '';
     GROUPS.forEach(g => {
       const gLevels = LEVELS.filter(l => l.groupId === g.id);
@@ -944,7 +977,7 @@
   }
 
   function updateHomeProgress() {
-    const stars = loadStars();
+    const stars = getStars();
     const done = LEVELS.filter(l => (stars[l.id] || 0) > 0).length;
     const sum = Object.values(stars).reduce((s, v) => s + v, 0);
     homeProgress.textContent = done >= LEVELS.length
@@ -1121,6 +1154,18 @@
     if (e.key === 'ArrowRight' && roundChecked) { e.preventDefault(); nextRound(); }
   });
 
+  // 测试模式：在主页依次输入 saodm 开启 / 关闭（仅本次会话，刷新即恢复）
+  document.addEventListener('keydown', (e) => {
+    if (currentView !== 'home') return;
+    if (e.key && e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      typedSeq = (typedSeq + e.key.toLowerCase()).slice(-5);
+      if (typedSeq === 'saodm') {
+        typedSeq = '';
+        toggleTestMode();
+      }
+    }
+  });
+
   // ═══════════════════════════════════════
   // Memory mode — 假名记忆
   // ═══════════════════════════════════════
@@ -1213,26 +1258,145 @@
   };
 
   // 常用寒暄语（短语 / 中文意思 / 读音文本）
+  // 读音联想：中文近似音，帮助记忆（只是助记，不是精确音标）
+  const SOUND_HINTS = {
+    a: '读「啊」', i: '读「衣」', u: '读「乌」', e: '读「诶」', o: '读「哦」',
+    ka: '读「卡」', ki: '像 key', ku: '读「哭」', ke: '像「开」', ko: '读「扣」',
+    sa: '读「撒」', shi: '读「西」', su: '读「苏」', se: '读「塞」', so: '读「搜」',
+    ta: '读「他」', chi: '读「七」', tsu: '读「次」', te: '像「太」', to: '读「偷」',
+    na: '读「那」', ni: '读「你」', nu: '读「奴」', ne: '读「内」', no: '读「诺」',
+    ha: '读「哈」', hi: '读「嘿」', fu: '读「夫」', he: '读「嘿」', ho: '读「嚯」',
+    ma: '读「妈」', mi: '读「咪」', mu: '读「木」', me: '读「妹」', mo: '读「摸」',
+    ya: '读「呀」', yu: '读「优」', yo: '读「哟」',
+    ra: '读「拉」', ri: '读「利」', ru: '读「路」', re: '读「来」', ro: '读「咯」',
+    wa: '读「哇」', wo: '读「哦」', n: '读「嗯」',
+    ga: '读「嘎」', gi: '读「给」', gu: '读「咕」', ge: '读「该」', go: '读「狗」',
+    za: '读「咋」', ji: '读「叽」', zu: '读「租」', ze: '读「贼」', zo: '读「奏」',
+    da: '读「搭」', di: '同 じ 读「叽」', du: '同 ず 读「租」', de: '读「呆」', do: '读「多」',
+    ba: '读「巴」', bi: '读「逼」', bu: '读「不」', be: '读「呗」', bo: '读「波」',
+    pa: '读「啪」', pi: '读「批」', pu: '读「噗」', pe: '读「胚」', po: '读「泼」',
+    kya: 'ki+呀', kyu: 'ki+优', kyo: 'ki+哟',
+    sha: '西+呀', shu: '西+优', sho: '西+哟',
+    cha: '七+呀', chu: '七+优', cho: '七+哟',
+    nya: 'ni+呀', nyu: 'ni+优', nyo: 'ni+哟',
+    hya: '嘿+呀', hyu: '嘿+优', hyo: '嘿+哟',
+    mya: '咪+呀', myu: '咪+优', myo: '咪+哟',
+    rya: '利+呀', ryu: '利+优', ryo: '利+哟',
+    gya: '给+呀', gyu: '给+优', gyo: '给+哟',
+    ja: '鸡+呀', ju: '鸡+优', jo: '鸡+哟',
+    bya: '逼+呀', byu: '逼+优', byo: '逼+哟',
+    pya: '批+呀', pyu: '批+优', pyo: '批+哟',
+  };
+
+  // 日常用语与寒暄（100 句）
   const GREETINGS = [
     ['おはよう','早上好','おはよう'],
     ['おはようございます','早上好（礼貌）','おはようございます'],
     ['こんにちは','你好','こんにちは'],
     ['こんばんは','晚上好','こんばんは'],
-    ['ありがとう','谢谢','ありがとう'],
-    ['すみません','对不起／劳驾','すみません'],
-    ['さようなら','再见','さようなら'],
+    ['おやすみ','晚安（口语）','おやすみ'],
     ['おやすみなさい','晚安','おやすみなさい'],
+    ['さようなら','再见','さようなら'],
+    ['じゃあね','回头见','じゃあね'],
+    ['また明日','明天见','またあした'],
+    ['またね','再见（轻松）','またね'],
+    ['はい','是','はい'],
+    ['いいえ','不是','いいえ'],
+    ['どうも','多谢／你好','どうも'],
+    ['ありがとう','谢谢','ありがとう'],
+    ['ありがとうございます','谢谢（礼貌）','ありがとうございます'],
+    ['どうもありがとうございます','非常感谢','どうもありがとうございます'],
+    ['ごめん','对不起（口语）','ごめん'],
+    ['ごめんなさい','对不起','ごめんなさい'],
+    ['すみません','对不起／劳驾','すみません'],
+    ['申し訳ありません','非常抱歉','もうしわけありません'],
+    ['失礼します','失陪／打扰了','しつれいします'],
+    ['失礼しました','刚才失礼了','しつれいしました'],
+    ['お願いします','拜托了','おねがいします'],
+    ['よろしくお願いします','请多关照','よろしくおねがいします'],
+    ['お願いできますか','能拜托你吗','おねがいできますか'],
+    ['ちょっと待ってください','请稍等','ちょっとまってください'],
+    ['もう一度お願いします','请再说一遍','もういちどおねがいします'],
+    ['ゆっくり話してください','请慢点说','ゆっくりはなしてください'],
+    ['英語がわかりますか','懂英语吗','えいごがわかりますか'],
+    ['日本語がわかりますか','懂日语吗','にほんごがわかりますか'],
     ['いただきます','我开动了（饭前）','いただきます'],
     ['ごちそうさまでした','谢谢款待（饭后）','ごちそうさまでした'],
-    ['じゃあね','回头见','じゃあね'],
-    ['はい／いいえ','是／不是','はい いいえ'],
+    ['おいしいです','很好吃','おいしいです'],
+    ['水をください','请给我水','みずをください'],
+    ['メニューをお願いします','请给我菜单','メニューをおねがいします'],
+    ['お会計お願いします','请结账','おかいけいおねがいします'],
+    ['乾杯','干杯','かんぱい'],
+    ['いくらですか','多少钱','いくらですか'],
+    ['これをください','请给我这个','これをください'],
+    ['試着してもいいですか','可以试穿吗','しちゃくしてもいいですか'],
+    ['安いですね','真便宜','やすいですね'],
+    ['高いですね','真贵','たかいですね'],
+    ['袋をください','请给我袋子','ふくろをください'],
+    ['カードで払えますか','可以刷卡吗','カードではらえますか'],
+    ['駅はどこですか','车站在哪里','えきはどこですか'],
+    ['トイレはどこですか','厕所在哪里','トイレはどこですか'],
+    ['ここ','这里','ここ'],
+    ['そこ','那里','そこ'],
+    ['あそこ','那边','あそこ'],
+    ['まっすぐ行ってください','请直走','まっすぐいってください'],
+    ['右に曲がってください','请右转','みぎにまがってください'],
+    ['左に曲がってください','请左转','ひだりにまがってください'],
+    ['地図をください','请给我地图','ちずをください'],
+    ['タクシーを呼んでください','请叫出租车','タクシーをよんでください'],
+    ['今何時ですか','现在几点','いまなんじですか'],
+    ['今日','今天','きょう'],
+    ['明日','明天','あした'],
+    ['昨日','昨天','きのう'],
+    ['今','现在','いま'],
+    ['時間がありますか','有时间吗','じかんがありますか'],
+    ['大丈夫です','没关系／没事','だいじょうぶです'],
+    ['大丈夫ですか','你没事吧','だいじょうぶですか'],
+    ['お元気ですか','你好吗','おげんきですか'],
+    ['元気です','我很好','げんきです'],
+    ['疲れました','我累了','つかれました'],
+    ['お腹がすきました','我饿了','おなかがすきました'],
+    ['喉が渇きました','我渴了','のどがかわきました'],
+    ['眠いです','我困了','ねむいです'],
+    ['暑いです','好热','あついです'],
+    ['寒いです','好冷','さむいです'],
+    ['嬉しいです','我很高兴','うれしいです'],
+    ['楽しいです','很开心','たのしいです'],
+    ['悲しいです','很难过','かなしいです'],
+    ['心配しないでください','请不要担心','しんぱいしないでください'],
+    ['わかりました','明白了','わかりました'],
+    ['わかりません','不明白','わかりません'],
+    ['いいです','好的／不用了','いいです'],
+    ['だめです','不行','だめです'],
+    ['もちろん','当然','もちろん'],
+    ['そうですね','是啊','そうですね'],
+    ['本当ですか','真的吗','ほんとうですか'],
+    ['いいですね','真好','いいですね'],
+    ['すごい','好厉害','すごい'],
+    ['おめでとうございます','恭喜','おめでとうございます'],
+    ['お久しぶりです','好久不见','おひさしぶりです'],
+    ['初めまして','初次见面','はじめまして'],
+    ['よろしく','请多关照（口语）','よろしく'],
+    ['助けてください','请帮帮我','たすけてください'],
+    ['気をつけてください','请小心','きをつけてください'],
+    ['行ってきます','我出门了','いってきます'],
+    ['行ってらっしゃい','慢走','いってらっしゃい'],
+    ['ただいま','我回来了','ただいま'],
+    ['おかえり','欢迎回来','おかえり'],
+    ['お大事に','请保重','おだいじに'],
+    ['頑張って','加油','がんばって'],
+    ['お疲れ様でした','辛苦了','おつかれさまでした'],
+    ['また会いましょう','下次再见','またあいましょう'],
+    ['いい天気ですね','天气真好','いいてんきですね'],
+    ['気をつけてね','路上小心','きをつけてね'],
+    ['どうぞ','请（请用／请进）','どうぞ'],
   ];
 
   const MEMORY_SETS = [
     { id: 1, name: '清音', emoji: '🌸', desc: '从汉字演变认识基本五十音', data: GROUPS[0].data, kind: 'seion' },
     { id: 2, name: '浊音・半浊音', emoji: '🌊', desc: '清音加两点・圆圈变浊音半浊音', data: GROUPS[1].data, kind: 'dakuon' },
     { id: 3, name: '拗音', emoji: '🍡', desc: 'い段假名加小写 ゃ・ゅ・ょ', data: GROUPS[2].data, kind: 'youon' },
-    { id: 4, name: '寒暄语', emoji: '💬', desc: '常用问候与礼貌用语（12句）', data: GREETINGS, kind: 'greeting' },
+    { id: 4, name: '日常用语', emoji: '💬', desc: '日常高频用语与寒暄（100句）', data: GREETINGS, kind: 'greeting' },
   ];
   const MEMORY_STORAGE_KEY = 'kana_memory_progress';
 
@@ -1244,6 +1408,7 @@
   let memAnswered = false;
   let memTaskQueue = [];
   let memTimer = null;
+  let memLastMethod = '';   // 上一个假名用的记忆方法，避免连续重复
 
   const memorySetsView = $('#memorySetsView');
   const memoryView = $('#memoryView');
@@ -1380,7 +1545,17 @@
           <div class="mem-roma"><button class="speaker-btn" id="btnSpeak">🔊 再听一遍</button></div>
         </div>`;
     } else {
-      // 例词联想：单词里的目标假名会被高亮（多为片假名词，顺便强化片假名）
+      // 记忆方法随机混用：汉字来源 / 例词 / 读音联想 / 结构规则（连续不重复）
+      const methodPool = s.kind === 'seion'
+        ? ['origin', 'word', 'sound']
+        : ['rule', 'word', 'sound'];
+      let method = methodPool[Math.floor(Math.random() * methodPool.length)];
+      if (method === memLastMethod) {
+        method = methodPool[(methodPool.indexOf(method) + 1) % methodPool.length];
+      }
+      memLastMethod = method;
+
+      // 例词：单词里的目标假名会高亮（多为片假名词，顺便强化片假名）
       const we = WORD_EXAMPLES[romaji];
       let wordHtml = '';
       if (we) {
@@ -1389,16 +1564,41 @@
         const marked = glyph ? word.replace(glyph, `<mark class="word-mark">${glyph}</mark>`) : word;
         wordHtml = `<div class="mem-word">例词：${marked}<span class="mem-word-mean">${meaning}</span></div>`;
       }
-      if (s.kind === 'seion') {
+
+      // 根据随机方法生成记忆提示块
+      let methodBlock = '';
+      if (method === 'word') {
+        methodBlock = wordHtml;
+      } else if (method === 'sound') {
+        methodBlock = `<p class="mem-hint">读音联想：${SOUND_HINTS[romaji] || romaji}</p>`;
+      } else if (method === 'origin' && s.kind === 'seion') {
         const o = SEION_ORIGINS[romaji];
-        inner = `
-          <div class="mem-discover">
-            <div class="mem-kana-row">
-              <div class="kana-big" id="memBig">${h}<span class="kana-big-tag">平</span></div>
-              <div class="kana-big kata" id="memBigKata">${kata}<span class="kana-big-tag">片</span></div>
-            </div>
-            <div class="mem-roma">${romaji} <button class="speaker-btn" id="btnSpeak">🔊 再听一遍</button></div>
-            ${wordHtml}
+        methodBlock = `
+          <div class="mem-origin" id="memOrigin">
+            <span class="origin-kanji">${o.hira}</span>
+            <span class="origin-arrow">→</span>
+            <span class="origin-kana">${h}</span>
+            <span class="origin-divider">·</span>
+            <span class="origin-kanji">${o.kata}</span>
+            <span class="origin-arrow">→</span>
+            <span class="origin-kana">${kata}</span>
+          </div>
+          <p class="mem-hint">${o.hint}</p>`;
+      } else if (method === 'rule' && s.kind === 'dakuon') {
+        const [baseRomaji, mark] = DAKUON_BASE[romaji];
+        const base = LEVELS[0].data.find(d => d[2] === baseRomaji);
+        const markLabel = mark === 'daku' ? '゛' : '゜';
+        const markName = mark === 'daku' ? '浊点（゛）' : '半浊点（゜）';
+        const finalName = mark === 'daku' ? '浊音' : '半浊音';
+        methodBlock = `<p class="mem-hint">清音「${base[0]}」加上 ${markName}，变成${finalName}「${h}」，读「${romaji}」。</p>`;
+      } else if (method === 'rule' && s.kind === 'youon') {
+        const first = h[0], small = h[1];
+        methodBlock = `<p class="mem-hint">「${first}」+ 小写「${small}」组合成拗音「${h}」，读「${romaji}」。</p>`;
+      } else {
+        // 兜底：退回该组最经典的方法
+        if (s.kind === 'seion') {
+          const o = SEION_ORIGINS[romaji];
+          methodBlock = `
             <div class="mem-origin" id="memOrigin">
               <span class="origin-kanji">${o.hira}</span>
               <span class="origin-arrow">→</span>
@@ -1408,14 +1608,34 @@
               <span class="origin-arrow">→</span>
               <span class="origin-kana">${kata}</span>
             </div>
-            <p class="mem-hint">${o.hint}</p>
+            <p class="mem-hint">${o.hint}</p>`;
+        } else if (s.kind === 'dakuon') {
+          const [baseRomaji, mark] = DAKUON_BASE[romaji];
+          const base = LEVELS[0].data.find(d => d[2] === baseRomaji);
+          const markLabel = mark === 'daku' ? '゛' : '゜';
+          const markName = mark === 'daku' ? '浊点（゛）' : '半浊点（゜）';
+          const finalName = mark === 'daku' ? '浊音' : '半浊音';
+          methodBlock = `<p class="mem-hint">清音「${base[0]}」加上 ${markName}，变成${finalName}「${h}」，读「${romaji}」。</p>`;
+        } else {
+          const first = h[0], small = h[1];
+          methodBlock = `<p class="mem-hint">「${first}」+ 小写「${small}」组合成拗音「${h}」，读「${romaji}」。</p>`;
+        }
+      }
+
+      if (s.kind === 'seion') {
+        inner = `
+          <div class="mem-discover">
+            <div class="mem-kana-row">
+              <div class="kana-big" id="memBig">${h}<span class="kana-big-tag">平</span></div>
+              <div class="kana-big kata" id="memBigKata">${kata}<span class="kana-big-tag">片</span></div>
+            </div>
+            <div class="mem-roma">${romaji} <button class="speaker-btn" id="btnSpeak">🔊 再听一遍</button></div>
+            ${methodBlock}
           </div>`;
       } else if (s.kind === 'dakuon') {
         const [baseRomaji, mark] = DAKUON_BASE[romaji];
         const base = LEVELS[0].data.find(d => d[2] === baseRomaji);
         const markLabel = mark === 'daku' ? '゛' : '゜';
-        const markName = mark === 'daku' ? '浊点（゛）' : '半浊点（゜）';
-        const finalName = mark === 'daku' ? '浊音' : '半浊音';
         inner = `
           <div class="mem-discover">
             <div class="mem-kana-row">
@@ -1423,8 +1643,7 @@
               <div class="kana-big kata" id="memBigKata">${base[1]}<sup class="daku-mark" id="dakuMarkKata">${markLabel}</sup><span class="kana-big-tag">片</span></div>
             </div>
             <div class="mem-roma">${baseRomaji} → ${romaji} <button class="speaker-btn" id="btnSpeak">🔊 再听一遍</button></div>
-            ${wordHtml}
-            <p class="mem-hint">清音「${base[0]}」加上 ${markName}，变成${finalName}「${h}」，读「${romaji}」。</p>
+            ${methodBlock}
           </div>`;
       } else {
         const first = h[0], small = h[1];
@@ -1432,12 +1651,11 @@
         inner = `
           <div class="mem-discover">
             <div class="mem-kana-row">
-              <div class="kana-big" id="memBig">${first}<small class="youon-small">${small}</small><span class="kana-big-tag">平</span></div>
-              <div class="kana-big kata" id="memBigKata">${kataFirst}<small class="youon-small">${kataSmall}</small><span class="kana-big-tag">片</span></div>
+              <div class="kana-big compound" id="memBig">${first}<small class="youon-small">${small}</small><span class="kana-big-tag">平</span></div>
+              <div class="kana-big kata compound" id="memBigKata">${kataFirst}<small class="youon-small">${kataSmall}</small><span class="kana-big-tag">片</span></div>
             </div>
             <div class="mem-roma">${romaji} <button class="speaker-btn" id="btnSpeak">🔊 再听一遍</button></div>
-            ${wordHtml}
-            <p class="mem-hint">「${first}」+ 小写「${small}」组合成拗音「${h}」，读「${romaji}」。</p>
+            ${methodBlock}
           </div>`;
       }
     }
@@ -1656,7 +1874,7 @@
     memoryCard.innerHTML = `
       <div class="mem-recall">
         <p class="mem-prompt">${recallType === 'glyph' ? '记住它的样子' : '记住它读什么'}</p>
-        <div class="recall-flash" id="recallFlash">${glyph}</div>
+        <div class="recall-flash ${s.kind === 'youon' ? 'compound' : ''}" id="recallFlash">${glyph}</div>
         ${recallType === 'glyph' ? `<p class="mem-recall-roma">${romaji}</p>` : ''}
       </div>`;
     document.getElementById('recallFlash').classList.add('flash');
@@ -1750,6 +1968,12 @@
   setupRound(1, 1);
   updateHomeProgress();
 })();
+
+
+
+
+
+
 
 
 

@@ -631,3 +631,37 @@ body { overscroll-behavior: none; }
   border-radius: 20px;
 }
 
+
+/* 冒泡提示（测试模式） */
+.toast {
+  position: fixed; top: 18px; left: 50%;
+  transform: translateX(-50%) translateY(-16px);
+  background: rgba(61, 50, 38, 0.92); color: #fff;
+  padding: 12px 22px; border-radius: 999px;
+  font-size: 0.9rem; font-weight: 700; letter-spacing: 0.02em;
+  opacity: 0; pointer-events: none; z-index: 2000;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  max-width: 92%; text-align: center;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* 拗音回忆闪卡：横向、宽度稍宽，避免两个假名溢出 */
+.recall-flash.compound {
+  width: auto;
+  min-width: 180px;
+  height: 150px;
+  padding: 0 28px;
+  white-space: nowrap;
+  display: inline-flex;
+  font-size: 4.2rem;
+}
+
+/* 拗音认识大卡：稍宽，避免两个假名超出边界 */
+.kana-big.compound { width: 134px; font-size: 3rem; }
+.kana-big.compound .youon-small { font-size: 1.4rem; }
+
+@media (max-width: 480px) {
+  .kana-big.compound { width: 104px; font-size: 2.3rem; }
+  .recall-flash.compound { min-width: 140px; font-size: 3rem; padding: 0 18px; }
+}
