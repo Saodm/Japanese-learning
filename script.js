@@ -441,6 +441,8 @@
     const replay = document.getElementById('btnReplay');
     if (replay) replay.addEventListener('click', () => speakKana(h));
 
+    // 每道新题都重置答题状态，否则答完第一题后面全部点不动
+    quizAnswered = false;
     const kanaForRecord = k.showAs === 'hiragana' ? h : kata;
     quizArea.querySelectorAll('.opt-card').forEach(el => {
       el.addEventListener('click', () => {
@@ -448,8 +450,9 @@
         quizAnswered = true;
         const idx = parseInt(el.dataset.opt);
         const chosen = opts[idx];
+        const isCorrect = chosen === correctLabel;
         const fb = document.getElementById('quizFeedback');
-        if (chosen.correct) {
+        if (isCorrect) {
           el.classList.add('correct');
           fb.textContent = '✓ 正确！';
           fb.className = 'mem-feedback ok';
@@ -460,9 +463,9 @@
           fb.textContent = `正确答案是「${correctLabel}」`;
           fb.className = 'mem-feedback bad';
           opts.forEach((o, i) => {
-            if (o.correct) quizArea.querySelectorAll('.opt-card')[i].classList.add('correct');
+            if (o === correctLabel) quizArea.querySelectorAll('.opt-card')[i].classList.add('correct');
           });
-          recordWrongAnswer(currentLevel, kanaForRecord, k.showAs, romaji, chosen.label);
+          recordWrongAnswer(currentLevel, kanaForRecord, k.showAs, romaji, chosen);
         }
         quizTimer = setTimeout(advanceQuiz, 950);
       });
@@ -496,7 +499,7 @@
   function renderMatch() {
     quizArea.innerHTML = `
       <div class="quiz-box">
-        <p class="quiz-progress">翻开两张卡片，配成「假名 ↔ 罗马音」</p>
+        <p class="quiz-progress">先翻一张假名卡，再翻一张罗马音卡：配对成功会保留，配错会翻回去，记住位置</p>
         <div class="match-grid">
           ${matchCards.map((c, i) => `
             <button class="match-card" data-i="${i}">
@@ -1968,6 +1971,8 @@
   setupRound(1, 1);
   updateHomeProgress();
 })();
+
+
 
 
 
