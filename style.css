@@ -665,3 +665,11 @@ body { overscroll-behavior: none; }
   .kana-big.compound { width: 104px; font-size: 2.3rem; }
   .recall-flash.compound { min-width: 140px; font-size: 3rem; padding: 0 18px; }
 }
+
+/* 手机端：7 个选项（第3/4/5轮）改为每排两个、从上往下排 */
+@media (max-width: 560px) {
+  .romaji-grid.cols-7 {
+    grid-template-columns: repeat(2, minmax(0, 150px));
+    gap: 8px;
+  }
+}
