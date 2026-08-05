@@ -1268,38 +1268,46 @@
   const memoryDoneSummary = $('#memoryDoneSummary');
   const memoryDoneStars = $('#memoryDoneStars');
 
-  let jaVoice = null;
-  function refreshJaVoice() {
-    if (!('speechSynthesis' in window)) return;
-    jaVoice = speechSynthesis.getVoices().find(v => v.lang && v.lang.toLowerCase().indexOf('ja') === 0) || null;
-  }
-  if ('speechSynthesis' in window) {
-    refreshJaVoice();
-    speechSynthesis.addEventListener('voiceschanged', refreshJaVoice);
-  }
-  // 准确读音：优先系统日语语音，没有日语语音时调用在线日语 TTS（还原为拆分前版本）
+  // 朗读：优先使用网易有道日语发音接口（成熟稳定），失败时回退百度，最后用系统语音兜底
   function speakKana(text) {
     try {
-      refreshJaVoice();
-      if ('speechSynthesis' in window && jaVoice) {
-        speechSynthesis.cancel();
-        const u = new SpeechSynthesisUtterance(text);
-        u.lang = jaVoice.lang;
-        u.voice = jaVoice;
-        u.rate = 0.75;
-        speechSynthesis.speak(u);
+      if (!text) return;
+      playTtsUrl(text, [
+        'https://dict.youdao.com/dictvoice?le=jap&type=3&audio=' + encodeURIComponent(text),
+        'https://fanyi.baidu.com/gettts?lan=jp&spd=3&source=web&text=' + encodeURIComponent(text),
+      ]);
+    } catch (e) { /* ignore */ }
+  }
+
+  function playTtsUrl(text, urls) {
+    let audio = document.getElementById('ttsAudio');
+    if (!audio) {
+      audio = document.createElement('audio');
+      audio.id = 'ttsAudio';
+      audio.preload = 'auto';
+      audio.volume = 1;
+      document.body.appendChild(audio);
+    }
+    let i = 0;
+    const next = () => {
+      if (i >= urls.length) {
+        // 在线接口都失败时用系统语音兜底
+        if ('speechSynthesis' in window) {
+          speechSynthesis.cancel();
+          const u = new SpeechSynthesisUtterance(text);
+          u.lang = 'ja-JP';
+          u.rate = 0.8;
+          speechSynthesis.speak(u);
+        }
         return;
       }
-      const url = 'https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=ja&q=' + encodeURIComponent(text);
-      let audio = document.getElementById('ttsAudio');
-      if (!audio) {
-        audio = document.createElement('audio');
-        audio.id = 'ttsAudio';
-        document.body.appendChild(audio);
-      }
+      const url = urls[i++];
+      audio.onerror = next;
       audio.src = url;
-      audio.play().catch(() => {});
-    } catch (e) { /* ignore */ }
+      const p = audio.play();
+      if (p && p.catch) p.catch(next);
+    };
+    next();
   }
 
   function loadMemProgress() {
@@ -1751,6 +1759,7 @@
   setupRound(1, 1);
   updateHomeProgress();
 })();
+
 
 
 
