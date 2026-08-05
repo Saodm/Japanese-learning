@@ -653,9 +653,8 @@
       return;
     }
 
-    card.classList.remove('dragging');
-
-    // 以卡片中心定位目标框，避免松手坐标偏差导致吸错
+    // 关键：判定目标框时卡片必须保持 fixed 定位，布局才不会变。
+    // 一旦移除 fixed 类，卡片会变成页面流里的普通元素，整个页面会瞬间移位，导致坐标全错。
     const rect = card.getBoundingClientRect();
     const cx = rect.left + rect.width / 2;
     const cy = rect.top + rect.height / 2;
@@ -680,28 +679,20 @@
       renderGame();
       updateUI();
     } else if (dragInfo.origin === 'pool') {
-      // Return to pool with animation
+      // 保持 fixed 定位飞回池子，动画结束后再移除重建
+      card.classList.remove('dragging');
       card.classList.add('returning');
       card.style.left = dragInfo.startRect.left + 'px';
       card.style.top = dragInfo.startRect.top + 'px';
 
       setTimeout(() => {
-        card.classList.remove('returning');
-        card.style.left = '';
-        card.style.top = '';
-        card.style.width = '';
-        card.style.height = '';
         if (card.parentElement) card.remove();
         renderGame();
         updateUI();
       }, 360);
     } else {
       // From zone — re-render immediately
-      card.style.left = '';
-      card.style.top = '';
-      card.style.width = '';
-      card.style.height = '';
-      if (card.parentElement) card.remove();
+      card.remove();
       renderGame();
       updateUI();
     }
@@ -1759,6 +1750,8 @@
   setupRound(1, 1);
   updateHomeProgress();
 })();
+
+
 
 
 
