@@ -419,7 +419,7 @@
       correctLabel = h;
       opts = pickDistractors(lv.data.map(d => d[0]), h, 3, x => (x[0] === h[0] ? 1 : 0));
       glyphHtml = '<div class="quiz-glyph">🎧</div>';
-      speakKana(h);
+      speak(romaji);
     }
 
     const optHtml = opts.map((label, i) =>
@@ -435,7 +435,7 @@
       </div>`;
 
     const replay = document.getElementById('btnReplay');
-    if (replay) replay.addEventListener('click', () => speakKana(h));
+    if (replay) replay.addEventListener('click', () => speak(romaji));
 
     const kanaForRecord = k.showAs === 'hiragana' ? h : kata;
     quizArea.querySelectorAll('.opt-card').forEach(el => {
@@ -970,7 +970,7 @@
       html += `<tr><td class="row-name">${rowName}</td>`;
       cells.forEach(c => {
         if (!c) { html += '<td class="cell-empty"></td>'; return; }
-        html += `<td class="cell-speak" data-kana="${c[0]}" title="点击朗读"><div class="cell-kana"><span>${c[0]}</span><span class="kata">${c[1]}</span></div><div class="cell-roma">${c[2]}</div></td>`;
+        html += `<td class="cell-speak" data-kana="${c[0]}" data-roma="${c[2]}" title="点击朗读"><div class="cell-kana"><span>${c[0]}</span><span class="kata">${c[1]}</span></div><div class="cell-roma">${c[2]}</div></td>`;
       });
       html += '</tr>';
     });
@@ -1001,9 +1001,9 @@
     // 点击假名朗读
     chartContent.querySelectorAll('.cell-speak').forEach(td => {
       td.addEventListener('click', () => {
-        const kana = td.dataset.kana;
-        if (!kana) return;
-        speakKana(kana);
+        const roma = td.dataset.roma;
+        if (!roma) return;
+        speak(roma);
         td.classList.remove('speaking');
         void td.offsetWidth;
         td.classList.add('speaking');
@@ -1268,37 +1268,15 @@
   const memoryDoneSummary = $('#memoryDoneSummary');
   const memoryDoneStars = $('#memoryDoneStars');
 
-  let jaVoice = null;
-  function refreshJaVoice() {
-    if (!('speechSynthesis' in window)) return;
-    jaVoice = speechSynthesis.getVoices().find(v => v.lang && v.lang.toLowerCase().indexOf('ja') === 0) || null;
-  }
-  if ('speechSynthesis' in window) {
-    refreshJaVoice();
-    speechSynthesis.addEventListener('voiceschanged', refreshJaVoice);
-  }
-  // 准确读音：优先系统日语语音，没有日语语音时调用在线日语 TTS（还原为拆分前版本）
-  function speakKana(text) {
+  // 读音：还原为原始版本（系统语音朗读罗马音，不强制绑定某个语音）
+  function speak(romaji) {
     try {
-      refreshJaVoice();
-      if ('speechSynthesis' in window && jaVoice) {
-        speechSynthesis.cancel();
-        const u = new SpeechSynthesisUtterance(text);
-        u.lang = jaVoice.lang;
-        u.voice = jaVoice;
-        u.rate = 0.75;
-        speechSynthesis.speak(u);
-        return;
-      }
-      const url = 'https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=ja&q=' + encodeURIComponent(text);
-      let audio = document.getElementById('ttsAudio');
-      if (!audio) {
-        audio = document.createElement('audio');
-        audio.id = 'ttsAudio';
-        document.body.appendChild(audio);
-      }
-      audio.src = url;
-      audio.play().catch(() => {});
+      if (!('speechSynthesis' in window)) return;
+      speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(romaji);
+      u.lang = 'ja-JP';
+      u.rate = 0.8;
+      speechSynthesis.speak(u);
     } catch (e) { /* ignore */ }
   }
 
@@ -1445,7 +1423,7 @@
     memoryCard.innerHTML = inner;
 
     const btnSpeak = document.getElementById('btnSpeak');
-    if (btnSpeak) btnSpeak.addEventListener('click', () => speakKana(h));
+    if (btnSpeak) btnSpeak.addEventListener('click', () => speak(romaji));
 
     // 动画：弹出、浊点落下、拗音合体、来源揭示
     const big = document.getElementById('memBig');
@@ -1467,7 +1445,7 @@
     const origin = document.getElementById('memOrigin');
     if (origin) setTimeout(() => origin.classList.add('show'), 320);
 
-    speakKana(h);
+    speak(romaji);
     memTimer = setTimeout(() => { btnMemoryNext.disabled = false; }, 1200);
   }
 
@@ -1627,7 +1605,7 @@
           <div class="recall-flash" id="recallFlash">${recallType === 'meaning' ? h : kata}</div>
         </div>`;
       document.getElementById('recallFlash').classList.add('flash');
-      speakKana(h);
+      speak(romaji);
       memTimer = setTimeout(() => {
         const phrasePool = s.data.map(d => d[0]);
         const meaningPool = s.data.map(d => d[1]);
@@ -1661,7 +1639,7 @@
         ${recallType === 'glyph' ? `<p class="mem-recall-roma">${romaji}</p>` : ''}
       </div>`;
     document.getElementById('recallFlash').classList.add('flash');
-    speakKana(h);
+    speak(romaji);
 
     memTimer = setTimeout(() => {
       const entries = s.data;
@@ -1751,6 +1729,8 @@
   setupRound(1, 1);
   updateHomeProgress();
 })();
+
+
 
 
 
