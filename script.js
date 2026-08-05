@@ -970,7 +970,7 @@
       html += `<tr><td class="row-name">${rowName}</td>`;
       cells.forEach(c => {
         if (!c) { html += '<td class="cell-empty"></td>'; return; }
-        html += `<td><div class="cell-kana"><span>${c[0]}</span><span class="kata">${c[1]}</span></div><div class="cell-roma">${c[2]}</div></td>`;
+        html += `<td class="cell-speak" data-kana="${c[0]}" title="点击朗读"><div class="cell-kana"><span>${c[0]}</span><span class="kata">${c[1]}</span></div><div class="cell-roma">${c[2]}</div></td>`;
       });
       html += '</tr>';
     });
@@ -997,6 +997,18 @@
         </ul>
       </div>`;
     chartContent.innerHTML = html;
+
+    // 点击假名朗读
+    chartContent.querySelectorAll('.cell-speak').forEach(td => {
+      td.addEventListener('click', () => {
+        const kana = td.dataset.kana;
+        if (!kana) return;
+        speakKana(kana);
+        td.classList.remove('speaking');
+        void td.offsetWidth;
+        td.classList.add('speaking');
+      });
+    });
   }
 
   // Wrong answers view
@@ -1265,7 +1277,7 @@
     refreshJaVoice();
     speechSynthesis.addEventListener('voiceschanged', refreshJaVoice);
   }
-  // 准确读音：优先系统日语语音；没有日语语音时走在线日语 TTS，多条线路自动切换（百度 → 有道 → Google）
+  // 准确读音：优先系统日语语音，没有日语语音时调用在线日语 TTS（还原为拆分前版本）
   function speakKana(text) {
     try {
       refreshJaVoice();
@@ -1278,32 +1290,16 @@
         speechSynthesis.speak(u);
         return;
       }
-      playTtsUrl(text, [
-        'https://fanyi.baidu.com/gettts?lan=jp&spd=3&source=web&text=' + encodeURIComponent(text),
-        'https://dict.youdao.com/dictvoice?audio=' + encodeURIComponent(text) + '&type=2',
-        'https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=ja&q=' + encodeURIComponent(text),
-      ]);
-    } catch (e) { /* ignore */ }
-  }
-
-  function playTtsUrl(text, urls) {
-    let audio = document.getElementById('ttsAudio');
-    if (!audio) {
-      audio = document.createElement('audio');
-      audio.id = 'ttsAudio';
-      audio.preload = 'auto';
-      document.body.appendChild(audio);
-    }
-    let i = 0;
-    const next = () => {
-      if (i >= urls.length) return;
-      const url = urls[i++];
-      audio.onerror = next;
+      const url = 'https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=ja&q=' + encodeURIComponent(text);
+      let audio = document.getElementById('ttsAudio');
+      if (!audio) {
+        audio = document.createElement('audio');
+        audio.id = 'ttsAudio';
+        document.body.appendChild(audio);
+      }
       audio.src = url;
-      const p = audio.play();
-      if (p && p.catch) p.catch(next);
-    };
-    next();
+      audio.play().catch(() => {});
+    } catch (e) { /* ignore */ }
   }
 
   function loadMemProgress() {
@@ -1755,6 +1751,7 @@
   setupRound(1, 1);
   updateHomeProgress();
 })();
+
 
 
 

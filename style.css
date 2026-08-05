@@ -604,3 +604,13 @@
 
 /* 防止拖动时页面回弹/滚动 */
 body { overscroll-behavior: none; }
+
+/* 图表假名点击朗读 */
+.kana-table td.cell-speak { cursor: pointer; transition: background 0.2s, border-color 0.2s; }
+.kana-table td.cell-speak:hover { border-color: #5b8cb8; background: #ecf3fa; }
+.kana-table td.cell-speak.speaking { animation: cellSpeak 0.45s ease; }
+@keyframes cellSpeak {
+  0% { transform: scale(1); background: #fffef9; }
+  40% { transform: scale(1.12); background: #fde9b8; }
+  100% { transform: scale(1); background: #fffef9; }
+}
