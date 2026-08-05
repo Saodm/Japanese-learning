@@ -138,7 +138,21 @@
   // Drag state
   let dragInfo = null;          // drag metadata
   const DRAG_DEADZONE = 6;      // px — minimum movement before real drag starts
-  const SNAP_THRESHOLD = 90;    // px — 指针距框中心不超过该距离时吸附
+  const SNAP_THRESHOLD = 90;    // px — 吸附距离上限（实际阈值会随框大小缩放）
+
+  // 拖动期间锁定页面滚动，避免移动端手指拖动时页面跟着滚导致定位错乱
+  let dragTouchLockHandler = null;
+  function setDragTouchLock(on) {
+    if (on) {
+      document.body.style.overflow = 'hidden';
+      dragTouchLockHandler = (e) => { e.preventDefault(); };
+      document.addEventListener('touchmove', dragTouchLockHandler, { passive: false });
+    } else {
+      document.body.style.overflow = '';
+      if (dragTouchLockHandler) document.removeEventListener('touchmove', dragTouchLockHandler);
+      dragTouchLockHandler = null;
+    }
+  }
 
   // DOM
   const $ = s => document.querySelector(s);
@@ -551,6 +565,7 @@
     clearCheckStyles();
 
     e.preventDefault();
+    setDragTouchLock(true);
     card.setPointerCapture(e.pointerId);
 
     const rect = card.getBoundingClientRect();
@@ -610,11 +625,14 @@
     const card = dragInfo.el;
     card.style.left = (e.clientX - dragInfo.offsetX) + 'px';
     card.style.top = (e.clientY - dragInfo.offsetY) + 'px';
-    updateZoneHighlights(e.clientX, e.clientY);
+    // 用卡片中心判定目标框，所见即所得，移动端更精准
+    const r = card.getBoundingClientRect();
+    updateZoneHighlights(r.left + r.width / 2, r.top + r.height / 2);
   }
 
   function onDragEnd(e) {
     if (!dragInfo) return;
+    setDragTouchLock(false);
 
     const card = dragInfo.el;
     clearZoneHighlights();
@@ -637,9 +655,10 @@
 
     card.classList.remove('dragging');
 
-    // 寻找目标框：指针在框内优先，否则按最近距离
-    const cx = e.clientX;
-    const cy = e.clientY;
+    // 以卡片中心定位目标框，避免松手坐标偏差导致吸错
+    const rect = card.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
     const bestZone = findTargetZone(cx, cy);
 
     if (bestZone) {
@@ -700,19 +719,32 @@
     return cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom;
   }
 
-  // 指针在框内时优先吸附该框；否则吸附距离最近且在阈值内的框
+  // 目标框判定：卡片中心在框内或贴近框边缘时直接锁定该框；
+  // 否则只在“离该框足够近”的范围内取最近者，避免误吸远处的框
   function findTargetZone(cx, cy) {
     const zones = romajiGrid.querySelectorAll('.romaji-zone');
-    for (const zone of zones) {
-      if (zoneContains(zone, cx, cy)) return zone;
-    }
+
     let best = null;
-    let bestDist = SNAP_THRESHOLD;
+    let bestDist = Infinity;
     zones.forEach(zone => {
-      const d = zoneCenterDist(zone, cx, cy);
-      if (d < bestDist) { bestDist = d; best = zone; }
+      const r = zone.getBoundingClientRect();
+      const pad = Math.max(10, Math.min(r.width, r.height) * 0.2);
+      if (cx >= r.left - pad && cx <= r.right + pad && cy >= r.top - pad && cy <= r.bottom + pad) {
+        const d = zoneCenterDist(zone, cx, cy);
+        if (d < bestDist) { bestDist = d; best = zone; }
+      }
     });
-    return best;
+    if (best) return best;
+
+    let near = null;
+    let nearDist = Infinity;
+    zones.forEach(zone => {
+      const r = zone.getBoundingClientRect();
+      const threshold = Math.min(SNAP_THRESHOLD, Math.max(r.width, r.height) * 0.9);
+      const d = zoneCenterDist(zone, cx, cy);
+      if (d < threshold && d < nearDist) { nearDist = d; near = zone; }
+    });
+    return near;
   }
 
   function updateZoneHighlights(cx, cy) {
@@ -1233,9 +1265,10 @@
     refreshJaVoice();
     speechSynthesis.addEventListener('voiceschanged', refreshJaVoice);
   }
-  // 准确读音：优先系统日语语音，没有日语语音时调用在线日语 TTS
+  // 准确读音：优先系统日语语音；没有日语语音时走在线日语 TTS，多条线路自动切换（百度 → 有道 → Google）
   function speakKana(text) {
     try {
+      refreshJaVoice();
       if ('speechSynthesis' in window && jaVoice) {
         speechSynthesis.cancel();
         const u = new SpeechSynthesisUtterance(text);
@@ -1245,16 +1278,32 @@
         speechSynthesis.speak(u);
         return;
       }
-      const url = 'https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=ja&q=' + encodeURIComponent(text);
-      let audio = document.getElementById('ttsAudio');
-      if (!audio) {
-        audio = document.createElement('audio');
-        audio.id = 'ttsAudio';
-        document.body.appendChild(audio);
-      }
-      audio.src = url;
-      audio.play().catch(() => {});
+      playTtsUrl(text, [
+        'https://fanyi.baidu.com/gettts?lan=jp&spd=3&source=web&text=' + encodeURIComponent(text),
+        'https://dict.youdao.com/dictvoice?audio=' + encodeURIComponent(text) + '&type=2',
+        'https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=ja&q=' + encodeURIComponent(text),
+      ]);
     } catch (e) { /* ignore */ }
+  }
+
+  function playTtsUrl(text, urls) {
+    let audio = document.getElementById('ttsAudio');
+    if (!audio) {
+      audio = document.createElement('audio');
+      audio.id = 'ttsAudio';
+      audio.preload = 'auto';
+      document.body.appendChild(audio);
+    }
+    let i = 0;
+    const next = () => {
+      if (i >= urls.length) return;
+      const url = urls[i++];
+      audio.onerror = next;
+      audio.src = url;
+      const p = audio.play();
+      if (p && p.catch) p.catch(next);
+    };
+    next();
   }
 
   function loadMemProgress() {
@@ -1706,4 +1755,8 @@
   setupRound(1, 1);
   updateHomeProgress();
 })();
+
+
+
+
 

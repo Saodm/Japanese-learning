@@ -601,3 +601,6 @@
   }
 
 
+
+/* 防止拖动时页面回弹/滚动 */
+body { overscroll-behavior: none; }
