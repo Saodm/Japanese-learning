@@ -617,3 +617,17 @@ body { overscroll-behavior: none; }
   100% { transform: scale(1); background: #fffef9; }
 }
 
+
+/* 寒暄语闪卡：横向、宽度随内容自适应 */
+.recall-flash.phrase {
+  display: inline-flex;
+  width: auto;
+  min-width: 120px;
+  max-width: 92%;
+  height: auto;
+  padding: 18px 28px;
+  font-size: clamp(1.3rem, 6vw, 2.2rem);
+  white-space: nowrap;
+  border-radius: 20px;
+}
+

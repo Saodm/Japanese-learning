@@ -1623,7 +1623,7 @@
       memoryCard.innerHTML = `
         <div class="mem-recall">
           <p class="mem-prompt">${recallType === 'meaning' ? '记住这句话' : '记住这个意思'}</p>
-          <div class="recall-flash" id="recallFlash">${recallType === 'meaning' ? h : kata}</div>
+          <div class="recall-flash phrase" id="recallFlash">${recallType === 'meaning' ? h : kata}</div>
         </div>`;
       document.getElementById('recallFlash').classList.add('flash');
       speakKana(h);
@@ -1750,6 +1750,7 @@
   setupRound(1, 1);
   updateHomeProgress();
 })();
+
 
 
 
