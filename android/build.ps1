@@ -29,6 +29,9 @@ $ksFile = Join-Path $scriptDir 'japanese.keystore'
 $build = Join-Path $scriptDir 'build'
 if (Test-Path $build) { Remove-Item -LiteralPath $build -Recurse -Force }
 New-Item -ItemType Directory -Path "$build\classes", "$build\dexout", "$build\dist" -Force | Out-Null
+# 复制一份 android.jar 到构建目录，避免编译时原文件被占用
+Copy-Item -LiteralPath $androidJar -Destination "$build\android.jar" -Force
+$androidJar = "$build\android.jar"
 
 # ---- 1. 同步网页资源 ----
 $assets = Join-Path $scriptDir 'app\assets\www'
@@ -37,7 +40,7 @@ Copy-Item -LiteralPath (Join-Path $repoRoot 'index.html'), (Join-Path $repoRoot 
 Write-Output '网页资源已同步'
 
 # ---- 2. 编译 Java ----
-& "$javaHome\bin\javac.exe" -source 1.8 -target 1.8 -bootclasspath $androidJar -d "$build\classes" (Join-Path $scriptDir 'app\src\com\saodm\japaneselearning\MainActivity.java')
+& "$javaHome\bin\javac.exe" -encoding UTF-8 -source 1.8 -target 1.8 -bootclasspath $androidJar -d "$build\classes" (Join-Path $scriptDir 'app\src\com\saodm\japaneselearning\MainActivity.java')
 if ($LASTEXITCODE -ne 0) { throw 'javac 编译失败' }
 Write-Output 'Java 编译完成'
 
@@ -48,20 +51,22 @@ Pop-Location
 if ($LASTEXITCODE -ne 0) { throw 'd8 生成 dex 失败' }
 Write-Output 'dex 生成完成'
 
-# ---- 4. 资源编译与打包（aapt2） ----
-& "$buildTools\aapt2.exe" compile --dir (Join-Path $scriptDir 'app\res') -o "$build\res.zip"
-if ($LASTEXITCODE -ne 0) { throw 'aapt2 compile 失败' }
-& "$buildTools\aapt2.exe" link -o "$build\app.unsigned.apk" -I $androidJar --manifest (Join-Path $scriptDir 'app\AndroidManifest.xml') -R "$build\res.zip" --auto-add-overlay
-if ($LASTEXITCODE -ne 0) { throw 'aapt2 link 失败' }
+# ---- 4. 资源与网页资源打包（aapt，官方方式，保证 assets 路径为正向斜杠） ----
+& "$buildTools\aapt.exe" package -f -M (Join-Path $scriptDir 'app\AndroidManifest.xml') -S (Join-Path $scriptDir 'app\res') -I $androidJar -F "$build\app.unsigned.apk"
+if ($LASTEXITCODE -ne 0) { throw 'aapt package 失败' }
+
+# 网页资源以 assets 根目录下的正向斜杠路径加入
+Push-Location (Join-Path $scriptDir 'app\assets')
+& "$buildTools\aapt.exe" add "$build\app.unsigned.apk" www/index.html www/script.js www/style.css
+Pop-Location
+if ($LASTEXITCODE -ne 0) { throw 'aapt add 资源失败' }
 Write-Output '资源打包完成'
 
 # ---- 5. 写入 classes.dex ----
-& "$javaHome\bin\jar.exe" uf "$build\app.unsigned.apk" -C "$build\dexout" classes.dex
+Push-Location "$build\dexout"
+& "$buildTools\aapt.exe" add "$build\app.unsigned.apk" classes.dex
+Pop-Location
 if ($LASTEXITCODE -ne 0) { throw '写入 dex 失败' }
-
-# 网页资源以正斜杠规范路径加入（aapt2 在 Windows 上会写成反斜杠导致安卓找不到）
-& "$javaHome\bin\jar.exe" uf "$build\app.unsigned.apk" -C (Join-Path $scriptDir 'app\assets') .
-if ($LASTEXITCODE -ne 0) { throw '写入网页资源失败' }
 
 # ---- 6. 对齐 ----
 & "$buildTools\zipalign.exe" -f 4 "$build\app.unsigned.apk" "$build\app.aligned.apk"
@@ -77,4 +82,8 @@ $apk = Join-Path $build 'dist\JapaneseLearning.apk'
 if ($LASTEXITCODE -ne 0) { throw 'apksigner 签名失败' }
 & "$buildTools\apksigner.bat" verify --print-certs $apk | Out-Null
 Write-Output "APK 已生成: $apk"
+
+
+
+
 
