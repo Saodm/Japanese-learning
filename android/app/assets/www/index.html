@@ -1,0 +1,192 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>五十音练习 - 假名配对游戏</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app" id="app">
+
+  <!-- HOME VIEW -->
+  <div class="view active" id="homeView">
+    <div class="home-card">
+      <div class="home-icon">🎌</div>
+      <h1>五十音练习</h1>
+      <p class="subtitle">拖拽配对，掌握平假名与片假名</p>
+      <p class="home-progress" id="homeProgress"></p>
+      <div class="home-btns">
+        <button class="btn btn-primary" id="btnStart">🎮 开始试炼</button>
+        <button class="btn btn-secondary" id="btnMemory">🧠 假名记忆</button>
+        <button class="btn btn-secondary" id="btnChart">📖 五十音图表</button>
+        <button class="btn btn-secondary" id="btnWrongList">📋 错题集锦</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- LEVEL SELECT VIEW -->
+  <div class="view" id="levelsView">
+    <div class="wa-card">
+      <div class="wa-header">
+        <button class="btn-back" id="btnLevelsBack">← 返回</button>
+        <h2>🎯 选择关卡</h2>
+      </div>
+      <div class="level-list" id="levelsList"></div>
+    </div>
+  </div>
+
+  <!-- GAME VIEW -->
+  <div class="view" id="gameView">
+    <div class="game-header">
+      <button class="btn-back" id="btnBackHome">← 返回</button>
+      <span class="round-badge" id="levelBadge">第1关 · 清音</span>
+      <span class="round-badge" id="roundBadge">第1轮/共5轮</span>
+      <span class="error-badge" id="errorBadge">⚠️ 0次</span>
+    </div>
+    <div class="game-panel" id="gamePanel">
+      <div class="section-label">▲ 拖动假名 ▼</div>
+      <div class="kana-pool" id="kanaPool"></div>
+      <hr class="divider">
+      <div class="section-label">▼ 放到对应的罗马音位置 ▼</div>
+      <div class="romaji-grid" id="romajiGrid"></div>
+      <div id="quizArea"></div>
+      <div class="check-area">
+        <span class="hint-text" id="hintText">全部放好后点击确认</span>
+        <button class="btn btn-check" id="btnCheck" disabled>✓ 确认</button>
+        <button class="btn btn-round-next" id="btnRoundNext" style="display:none">下一轮 →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CHART VIEW -->
+  <div class="view" id="chartView">
+    <div class="wa-card">
+      <div class="wa-header">
+        <button class="btn-back" id="btnChartBack">← 返回</button>
+        <h2>📖 五十音图表</h2>
+      </div>
+      <div id="chartContent"></div>
+    </div>
+  </div>
+
+  <!-- WRONG ANSWERS VIEW -->
+  <div class="view" id="wrongAnswersView">
+    <div class="wa-card">
+      <div class="wa-header">
+        <button class="btn-back" id="btnWABack">← 返回</button>
+        <h2>📋 错题集锦</h2>
+      </div>
+      <div id="waContent"></div>
+    </div>
+  </div>
+
+  <!-- MEMORY SETS VIEW -->
+  <div class="view" id="memorySetsView">
+    <div class="wa-card">
+      <div class="wa-header">
+        <button class="btn-back" id="btnMemorySetsBack">← 返回</button>
+        <h2>🧠 假名记忆</h2>
+      </div>
+      <div class="level-list" id="memorySetsList"></div>
+    </div>
+  </div>
+
+  <!-- MEMORY VIEW -->
+  <div class="view" id="memoryView">
+    <div class="game-header">
+      <button class="btn-back" id="btnMemoryBack">← 退出</button>
+      <span class="round-badge" id="memorySetBadge"></span>
+      <span class="round-badge" id="memoryProgressBadge"></span>
+    </div>
+    <div class="memory-panel">
+      <div class="memory-phase" id="memoryPhaseBar">
+        <span class="phase-item active" data-phase="discover">👀 认识</span>
+        <span class="phase-arrow">→</span>
+        <span class="phase-item" data-phase="play">🎯 互动</span>
+        <span class="phase-arrow">→</span>
+        <span class="phase-item" data-phase="recall">💭 回忆</span>
+      </div>
+      <div class="memory-progress-track"><div class="memory-progress-fill" id="memoryProgressFill"></div></div>
+      <div class="memory-card" id="memoryCard"></div>
+      <div class="memory-actions">
+        <button class="btn btn-primary" id="btnMemoryNext" disabled>继续 →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MEMORY DONE OVERLAY -->
+  <div class="star-overlay" id="memoryDoneOverlay">
+    <div class="star-dialog">
+      <h2 id="memoryDoneTitle"></h2>
+      <p class="level-label">本组学习完成</p>
+      <div class="stars-row" id="memoryDoneStars">
+        <span class="star">★</span><span class="star">★</span><span class="star">★</span>
+      </div>
+      <p class="err-summary" id="memoryDoneSummary"></p>
+      <div class="star-actions">
+        <button class="btn btn-secondary" id="btnMemoryDoneHome">返回首页</button>
+        <button class="btn btn-primary" id="btnMemoryRetry">再学一遍</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- STAR OVERLAY -->
+  <div class="star-overlay" id="starOverlay">
+    <div class="star-dialog">
+      <h2 id="starTitle"></h2>
+      <p class="level-label" id="starLevelLabel"></p>
+      <div class="stars-row" id="starsRow">
+        <span class="star">★</span><span class="star">★</span><span class="star">★</span>
+      </div>
+      <p class="err-summary" id="starSummary"></p>
+      <div class="star-actions">
+        <button class="btn btn-secondary" id="btnStarHome">返回首页</button>
+        <button class="btn btn-primary" id="btnStarNext" style="display:none">下一关 →</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="script.js"></script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
