@@ -1,0 +1,17 @@
+﻿{
+  "name": "japanese-learning-app",
+  "version": "1.1.0",
+  "private": true,
+  "description": "五十音练习 - 日语假名学习 App",
+  "scripts": {
+    "sync": "cap sync",
+    "build:android": "cap sync android && cd android && gradlew.bat assembleRelease"
+  },
+  "dependencies": {
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/core": "^7.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.0.0"
+  }
+}

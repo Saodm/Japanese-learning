@@ -1,0 +1,12 @@
+﻿{
+  "appId": "com.saodm.japaneselearning",
+  "appName": "五十音练习",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#f5f0e8"
+  }
+}
